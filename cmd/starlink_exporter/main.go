@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 
 	"time"
 
@@ -12,6 +13,30 @@ import (
 	"github.com/prometheus/common/expfmt"
 	log "github.com/sirupsen/logrus"
 )
+
+func main() {
+	address := "192.168.100.1:9200"
+	intervalo := 5
+
+	duration := time.Duration(intervalo * 1000000000)
+
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
+
+	destino := "https://smme.innovacion.gob.sv/api/v1/push"
+	for {
+		metrics, err := obtenerMetricas(address)
+		if err != nil {
+			log.Error(err)
+		}
+
+		if err := enviarMetrics(destino, metrics); err != nil {
+			log.Error(err)
+		}
+
+		<-ticker.C
+	}
+}
 
 func obtenerMetricas(destino string) ([]*io_prometheus_client.MetricFamily, error) {
 	exporter, err := exporter.New(destino)
@@ -31,37 +56,34 @@ func obtenerMetricas(destino string) ([]*io_prometheus_client.MetricFamily, erro
 	return metricas, nil
 }
 
-func enviarMetrics(destino string, metrics []*io_prometheus_client.MetricFamily) error {
-	var buffer bytes.Buffer
-	encode := expfmt.NewEncoder(&buffer, expfmt.FmtOpenMetrics)
-	for _, metrica := range metrics {
+func enviarMetrics(destino string, data []*io_prometheus_client.MetricFamily) error {
+	var metrics bytes.Buffer
+	encode := expfmt.NewEncoder(&metrics, expfmt.FmtOpenMetrics)
+	for _, metrica := range data {
 		encode.Encode(metrica)
 	}
 
-	fmt.Printf("%s\n: %s\n", destino, &buffer)
+	req, err := http.NewRequest("POST", destino, bytes.NewBufferString(metrics.String()))
+	if err != nil {
+		return err
+	}
+
+	// Configurar headers
+	req.Header.Set("Content-Type", string(expfmt.FmtText))
+	req.Header.Set("X-Scope-OrgID", "Innovación") // Header necesario para Mimir
+
+	// Enviar petición
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Verificar respuesta
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("respuesta inesperada: %s", resp.Status)
+	}
 
 	return nil
-}
-
-func main() {
-	address := "192.168.100.1:9200"
-	intervalo := 5
-
-	duration := time.Duration(intervalo * 1000000000)
-
-	ticker := time.NewTicker(duration)
-	defer ticker.Stop()
-
-	for {
-		metrics, err := obtenerMetricas(address)
-		if err != nil {
-			log.Error(err)
-		}
-
-		if err := enviarMetrics(address, metrics); err != nil {
-			log.Error(err)
-		}
-
-		<-ticker.C
-	}
 }
