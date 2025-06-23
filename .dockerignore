@@ -1,5 +1,13 @@
-proto/
-dist/
-make.sh
-README.md
 .gitignore
+Dockerfile
+LICENSE
+README.md
+README.md
+cmd
+dist/
+go.mod
+go.sum
+internal
+make.sh
+pkg
+proto/

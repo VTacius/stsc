@@ -2,3 +2,5 @@ proto/
 dist/
 make.sh
 .idea/
+build/
+*.swp

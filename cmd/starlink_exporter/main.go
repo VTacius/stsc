@@ -18,8 +18,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const INTERVALO = "5"
-const STARLINK = "https://192.168.100.1:9200"
+const INTERVALO = "10"
+const STARLINK = "192.168.100.1:9200"
 const IDENTIFICADOR = "localidad"
 
 var items = []string{"uplink_throughput_bytes", "valid_seconds", "pop_ping_drop_ratio", "alert_mast_not_near_vertical", "alert_motors_stuck", "alert_slow_eth_speeds", "alert_thermal_shutdown", "alert_thermal_throttle", "alert_unexpected_location"}
@@ -127,8 +127,6 @@ func sendMetrics(url, username, password, data string) error {
 		return err
 	}
 
-	fmt.Printf("%+v", req)
-
 	// Configurar autenticación básica
 	req.SetBasicAuth(username, password)
 
@@ -167,21 +165,26 @@ func main() {
 		metrics, err := getMetrics(starlink)
 		if err != nil {
 			log.Error(err)
+			continue
 		}
 
 		data, err := convertToString(metrics)
 		if err != nil {
 			log.Error(err)
+			continue
 		}
 
 		resultado := parseData(data)
 
 		body := crear_peticion(identifier, resultado)
+		println(body)
 
 		if err := sendMetrics("https://smme.innovacion.gob.sv/api/v2/write", "victoria", "jVwUARKlQnDh3H9DcaKY", body); err != nil {
 			log.Error(err)
+			continue
 		}
 
+		fmt.Println("Envío satisfactorio")
 		<-ticker.C
 	}
 }
